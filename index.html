@@ -119,7 +119,7 @@
       products = data.products;
       $('store').textContent = `A gift from ${data.storeName}`;
       $('offer').textContent = data.offer;
-      $('privacy').textContent = `Your address is only shared with ${data.storeName} to ship this gift.`;
+      $('privacy').textContent = `Your address is only used to ship this gift.`;
       $('products').replaceChildren(...products.map(productCard));
       fill($('size'), products[0].sizes);
       fill($('color'), products[0].colors);
