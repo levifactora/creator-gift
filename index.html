@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://ydruqpueocahoowjmobl.supabase.co; img-src https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <title>A gift for you</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f6f3ee; --surface: #fffdf9; --ink: #1b1a17; --muted: #736e64; --line: #e5e0d6; --accent: #1b1a17; --on-accent: #fffdf9; --gold: #8f6f33; --danger: #a8321f; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #141310; --surface: #1e1c18; --ink: #f3efe7; --muted: #a39d91; --line: #322f29; --accent: #f3efe7; --on-accent: #1b1a17; --gold: #d2ae6c; --danger: #f08a78; } }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    main { max-width: 540px; margin: 0 auto; padding: 48px 16px 72px; }
+    h1 { margin: 0 0 8px; font: 500 36px/1.1 ui-serif, "New York", Georgia, serif; letter-spacing: -.015em; }
+    h2 { margin: 28px 0 12px; font: 500 21px ui-serif, "New York", Georgia, serif; }
+    .kicker { color: var(--gold); font: italic 14px ui-serif, "New York", Georgia, serif; }
+    .muted { color: var(--muted); }
+    #products { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .product { display: block; overflow: hidden; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); cursor: pointer; }
+    .product:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+    .product:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .product input { position: absolute; opacity: 0; }
+    .product img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+    .product span { display: block; padding: 10px 12px; font-weight: 600; font-size: 14px; }
+    label.field { display: block; margin-bottom: 12px; color: var(--muted); font-size: 13px; font-weight: 600; }
+    input:not([type=radio],[type=checkbox]), select { display: block; width: 100%; margin-top: 5px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font-size: 16px; font-family: inherit; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .check { display: flex; gap: 10px; align-items: flex-start; margin: 18px 0; font-size: 15px; }
+    .check input { margin-top: 4px; }
+    button { width: 100%; padding: 13px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 16px; font-weight: 600; font-family: inherit; cursor: pointer; }
+    button:disabled { opacity: .5; }
+    #errors { margin: 14px 0; padding: 0; color: var(--danger); list-style: none; font-size: 14px; }
+    .note { margin-top: 14px; color: var(--muted); font-size: 13px; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <div id="message"><p class="muted">Opening your gift…</p></div>
+    <form id="form" hidden novalidate>
+      <div class="kicker" id="store"></div>
+      <h1>Pick your gift</h1>
+      <p class="muted" id="offer"></p>
+
+      <h2>Choose one</h2>
+      <div id="products"></div>
+      <div class="row" style="margin-top:14px">
+        <label class="field">Size <select id="size"></select></label>
+        <label class="field">Color <select id="color"></select></label>
+      </div>
+
+      <h2>Where should it go?</h2>
+      <label class="field">Full name <input id="name" autocomplete="name"></label>
+      <label class="field">Street address <input id="line1" autocomplete="address-line1"></label>
+      <label class="field">Apt, suite (optional) <input id="line2" autocomplete="address-line2"></label>
+      <label class="field">City <input id="city" autocomplete="address-level2"></label>
+      <div class="row">
+        <label class="field">State <input id="state" maxlength="2" placeholder="CA" autocomplete="address-level1"></label>
+        <label class="field">ZIP code <input id="zip" inputmode="numeric" autocomplete="postal-code"></label>
+      </div>
+      <label class="check"><input type="checkbox" id="isAdult"> <span>I am 18 or older.</span></label>
+      <ul id="errors" role="alert"></ul>
+      <button id="submit">Send my choice</button>
+      <p class="note" id="privacy"></p>
+    </form>
+  </main>
+  <script>
+    const ENDPOINT = 'https://ydruqpueocahoowjmobl.supabase.co/functions/v1/gifts';
+    const $ = (id) => document.getElementById(id);
+    const token = location.hash.slice(1);
+    let products = [];
+
+    async function call(body) {
+      const response = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, token }),
+      });
+      return { status: response.status, data: await response.json() };
+    }
+
+    function say(title, text) {
+      const heading = Object.assign(document.createElement('h1'), { textContent: title });
+      const paragraph = Object.assign(document.createElement('p'), { textContent: text, className: 'muted' });
+      $('message').replaceChildren(heading, paragraph);
+      $('message').hidden = false;
+      $('form').hidden = true;
+    }
+
+    function fill(select, values) {
+      select.replaceChildren(...values.map((value) => new Option(value, value)));
+    }
+
+    function chosen() {
+      const id = document.querySelector('input[name=product]:checked')?.value;
+      return products.find((product) => product.id === id);
+    }
+
+    function productCard(product, index) {
+      const radio = Object.assign(document.createElement('input'), { type: 'radio', name: 'product', value: product.id, checked: index === 0 });
+      radio.addEventListener('change', () => {
+        fill($('size'), product.sizes);
+        fill($('color'), product.colors);
+      });
+      const card = Object.assign(document.createElement('label'), { className: 'product' });
+      card.append(radio);
+      if (product.imageUrl) card.append(Object.assign(document.createElement('img'), { src: product.imageUrl, alt: '' }));
+      card.append(Object.assign(document.createElement('span'), { textContent: product.name }));
+      return card;
+    }
+
+    async function start() {
+      if (!token) return say('This link isn’t complete', 'Please open the full link you were sent.');
+      const { status, data } = await call({ action: 'load' });
+      if (status !== 200) return say('This gift isn’t available', data.error ?? 'Please ask for a new link.');
+      if (!data.products.length) return say('Nothing to choose yet', 'Please check back soon.');
+      products = data.products;
+      $('store').textContent = `A gift from ${data.storeName}`;
+      $('offer').textContent = data.offer;
+      $('privacy').textContent = `Your address is only shared with ${data.storeName} to ship this gift.`;
+      $('products').replaceChildren(...products.map(productCard));
+      fill($('size'), products[0].sizes);
+      fill($('color'), products[0].colors);
+      $('message').hidden = true;
+      $('form').hidden = false;
+    }
+
+    $('form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      $('submit').disabled = true;
+      $('errors').replaceChildren();
+      try {
+        const form = Object.fromEntries(['size', 'color', 'name', 'line1', 'line2', 'city', 'state', 'zip'].map((id) => [id, $(id).value]));
+        const { status, data } = await call({ action: 'submit', productId: chosen()?.id, isAdult: $('isAdult').checked, ...form });
+        if (status === 200) return say('You’re all set', 'Thank you! They’ll review your choice and get it on its way.');
+        if (data.errors) {
+          $('errors').replaceChildren(...data.errors.map((text) => Object.assign(document.createElement('li'), { textContent: text })));
+        } else {
+          say('This gift isn’t available', data.error ?? 'Please ask for a new link.');
+        }
+      } catch {
+        $('errors').textContent = 'That didn’t go through. Check your connection and try again.';
+      }
+      $('submit').disabled = false;
+    });
+
+    start().catch(() => say('Something went wrong', 'Please try the link again in a moment.'));
+  </script>
+</body>
+</html>
